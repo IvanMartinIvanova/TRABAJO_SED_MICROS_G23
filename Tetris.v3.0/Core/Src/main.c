@@ -252,7 +252,7 @@ uint16_t beep_total_duration = 0;
 volatile uint8_t game_level = 1;
 volatile uint8_t next_shape_id = 0;
 volatile uint32_t game_score = 0;
-volatile uint32_t lines_cleared = 0;
+volatile uint32_t total_lines_cleared = 0;
 volatile uint8_t beeping = 0;
 /* USER CODE END PV */
 
@@ -394,7 +394,7 @@ int main(void)
         			  // Reset Game Variables
         			  game_score = 0;
         			  game_level = 1;
-        			  lines_cleared = 0;
+        			  total_lines_cleared = 0;
         			  gravity_speed = 500;
         			  next_shape_id = rand() % NUM_SHAPES;
 
@@ -412,7 +412,8 @@ int main(void)
           case STATE_SPAWN:
           {
               Tetromino_Spawn(next_shape_id);
-              if (Tetromino_CheckCollision(pivot_x, pivot_y)) {
+              uint8_t collision = Tetromino_CheckCollision(pivot_x, pivot_y);
+              if (collision) {
             	  Audio_Beep(300);
             	  current_state = STATE_GAMEOVER;
               } else {
@@ -426,14 +427,16 @@ int main(void)
           {
               // Gravity Logic
               if (now - last_gravity_time > gravity_speed) {
-            	  if (!Tetromino_CheckCollision(pivot_x, pivot_y + 1)) {
-            		  pivot_y++;
-                      game_score += DROP_POINTS;
-                  } else {
+            	  uint8_t collision = Tetromino_CheckCollision(pivot_x, pivot_y);
+            	  if (collision) {
                 	  // Lock Piece
                 	  Tetromino_Lock();
                 	  Audio_Beep(50);
                 	  current_state = STATE_STATS;
+                  } else {
+            		  // Continue Playing Logic
+                	  pivot_y++;
+                      game_score += DROP_POINTS;
                   }
             	  last_gravity_time = now;
               }
@@ -488,12 +491,12 @@ int main(void)
 
           case STATE_STATS:
           {
-        	  uint8_t cleared_lines = Check_Full_Rows();
-        	  if (cleared_lines > 0) {
-        		  game_score += (cleared_lines * FULLROW_POINTS * game_level);
-        		  lines_cleared += cleared_lines;
+        	  uint8_t lines_cleared = Check_Full_Rows();
+        	  if (lines_cleared > 0) {
+        		  game_score += (lines_cleared * FULLROW_POINTS * game_level);
+        		  total_lines_cleared += lines_cleared;
         		  // Level Up Logic
-                  if (lines_cleared >= (game_level * LNS_CLR_NXT_LVL)) {
+                  if (total_lines_cleared >= (game_level * LNS_CLR_NXT_LVL)) {
                 	  game_level++;
                 	  if (gravity_speed > 100) {
                 		  gravity_speed -= 50;
@@ -509,7 +512,10 @@ int main(void)
               // Update the LCD with the new score, level and next shape
               LCD_UpdateStats();
 
-              current_state = STATE_SPAWN;
+              uint8_t stats_ok = 1;
+              if (stats_ok) {
+            	  current_state = STATE_SPAWN;
+              }
               break;
           }
 
